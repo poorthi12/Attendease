@@ -1,8 +1,19 @@
+import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _default_app_env() -> str:
+    """Use secure session settings on Vercel unless it is running local dev."""
+    vercel_env = os.getenv("VERCEL_ENV", "").casefold()
+    if vercel_env == "development":
+        return "development"
+    if vercel_env in {"production", "preview"} or os.getenv("VERCEL") == "1":
+        return "production"
+    return "development"
 
 
 class Settings(BaseSettings):
@@ -13,9 +24,17 @@ class Settings(BaseSettings):
     )
     mongodb_database: str = "attendease"
     session_secret: SecretStr | None = None
-    app_env: Literal["development", "test", "production"] = "development"
+    app_env: Literal["development", "test", "production"] = Field(default_factory=_default_app_env)
     cookie_secure: bool = False
     session_max_age_seconds: int = Field(default=28800, ge=300, le=604800)
+
+    @model_validator(mode="before")
+    @classmethod
+    def enforce_production_on_vercel(cls, values: Any) -> Any:
+        if _default_app_env() == "production":
+            values = dict(values or {})
+            values["app_env"] = "production"
+        return values
 
     @model_validator(mode="after")
     def production_requires_secrets(self) -> "Settings":
