@@ -1,4 +1,63 @@
 {% extends "base.html" %}
-{% block content %}<section class="page-heading"><div><div class="page-kicker">TEACHER PORTAL · RECORDS</div><h1>Attendance history</h1><p>Finalized attendance sessions for your assigned subjects.</p></div></section>
-<form class="filter-row" method="get"><div class="filter-field filter-grow"><label for="subject_id">SUBJECT</label><select class="select" id="subject_id" name="subject_id"><option value="">All assigned subjects</option>{% for subject in subjects %}<option value="{{ subject.id }}" {% if selected_subject == subject.id %}selected{% endif %}>{{ subject.code }} · {{ subject.name }}</option>{% endfor %}</select></div><button class="button button-light button-small" type="submit">Filter</button><a class="button button-quiet button-small" href="/teacher/attendance-history">Reset</a></form>
-<section class="panel">{% if sessions %}<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Subject</th><th>Students</th><th>Present</th><th>Absent</th><th>Status</th></tr></thead><tbody>{% for session in sessions %}<tr><td class="mono">{{ session.date }}</td><td class="cell-primary">{{ session.subject_name }}</td><td>{{ session.student_count }}</td><td>{{ session.present_count }}</td><td>{{ session.absent_count }}</td><td><span class="badge badge-active">Finalized</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><span class="empty-icon">◷</span><strong>No finalized sessions</strong><p>Your class attendance sessions will appear here after saving.</p></div>{% endif %}</section>{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="page-kicker">TEACHER PORTAL &middot; RECORDS</div>
+    <h1>Attendance history</h1>
+    <p>Saved attendance sessions for your assigned subjects.</p>
+  </div>
+</section>
+
+<form class="filter-row" method="get">
+  <div class="filter-field filter-grow">
+    <label for="subject_id">SUBJECT</label>
+    <select class="select" id="subject_id" name="subject_id">
+      <option value="">All assigned subjects</option>
+      {% for subject in subjects %}
+      <option value="{{ subject.id }}" {% if selected_subject == subject.id %}selected{% endif %}>{{ subject.code }} &middot; {{ subject.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="button button-light button-small" type="submit">Filter</button>
+  <a class="button button-quiet button-small" href="/teacher/attendance-history">Reset</a>
+</form>
+
+<section class="panel">
+  {% if sessions %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Subject</th><th>Students marked</th><th>Present</th><th>Absent</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for session in sessions %}
+        <tr>
+          <td class="mono">{{ session.date }}</td>
+          <td class="cell-primary">{{ session.subject_name }}</td>
+          <td>{{ session.student_count }} / {{ session.expected_count }}</td>
+          <td>{{ session.present_count }}</td>
+          <td>{{ session.absent_count }}</td>
+          <td>
+            {% if session.status == 'finalized' %}
+            <span class="badge badge-active">Complete</span>
+            {% else %}
+            <span class="badge">In progress</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if session.status == 'in_progress' %}
+            <a class="button button-quiet button-small" href="/teacher/subjects/{{ session.subject_id }}/attendance/new?class_date={{ session.date }}">Resume</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">&#9707;</span>
+    <strong>No saved sessions</strong>
+    <p>Attendance sessions will appear here after the first marks are saved.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

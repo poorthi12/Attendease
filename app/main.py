@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
 from app.config import Settings, get_settings
-from app.database import close_client, ensure_indexes, get_database
+from app.database import close_client, ensure_indexes, get_client, get_database
 from app.routers import admin, attendance, auth, student, teacher
 from app.security.middleware import RequestLimitsAndHeaders
 from app.utils.responses import render
@@ -30,7 +30,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(application: FastAPI):
         if settings.mongodb_url and settings.app_env != "test":
             try:
-                await run_in_threadpool(ensure_indexes, get_database(settings))
+                database = get_client(settings)[settings.mongodb_database]
+                await run_in_threadpool(ensure_indexes, database)
             except Exception:
                 logger.warning("MongoDB indexes were not initialized; database-backed pages may be unavailable.")
         try:
@@ -74,6 +75,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @application.exception_handler(RequestValidationError)
     async def friendly_validation_error(request: Request, exc: RequestValidationError):
+        # Keep enough context to diagnose unexpected request-shape failures (such
+        # as a form submission rejected before its route handler runs), without
+        # logging submitted values or other potentially sensitive input.
+        errors = [
+            {
+                "location": ".".join(str(part) for part in error.get("loc", ())),
+                "type": error.get("type", "unknown"),
+                "message": error.get("msg", "Invalid value."),
+            }
+            for error in exc.errors()
+        ]
+        logger.warning(
+            "Request validation failed for %s %s: %s",
+            request.method,
+            request.url.path,
+            errors,
+        )
         return render(request, "errors/500.html", status_code=422, message="Please review the information and try again.")
 
     @application.exception_handler(Exception)

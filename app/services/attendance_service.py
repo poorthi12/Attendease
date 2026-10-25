@@ -4,7 +4,7 @@ from typing import Iterable
 
 from bson import ObjectId
 from pymongo import ASCENDING
-from pymongo.errors import DuplicateKeyError, OperationFailure, PyMongoError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 from pymongo.database import Database
 
 logger = logging.getLogger(__name__)
@@ -35,16 +35,6 @@ def attendance_summary(sessions: Iterable[dict]) -> dict[str, int | float | None
     }
 
 
-def _insert_records_with_transaction(database: Database, session_doc: dict, records: list[dict], audit: dict) -> None:
-    client = database.client
-    with client.start_session() as mongo_session:
-        with mongo_session.start_transaction():
-            database.attendance_sessions.insert_one(session_doc, session=mongo_session)
-            if records:
-                database.attendance_records.insert_many(records, ordered=True, session=mongo_session)
-            database.audit_logs.insert_one(audit, session=mongo_session)
-
-
 def finalize_attendance(
     database: Database,
     *,
@@ -54,14 +44,19 @@ def finalize_attendance(
     statuses: dict[str, str],
     enrolled_student_ids: set[str],
 ) -> ObjectId:
-    """Finalize one unique class date. Atlas transactions provide all-or-nothing writes.
+    """Save marks incrementally for one unique subject/date session.
 
-    If the deployment does not support transactions, a pending session is used and every
-    partial write is removed before an error is returned. A unique (subject, date) index
-    prevents concurrent teachers from creating duplicate sessions.
+    Each student's record is an independent durable write, so a teacher can save a few
+    marks, leave, and continue later. The session is finalized once every currently
+    enrolled student has a record. The unique subject/date index keeps one session per
+    class date.
     """
-    if not statuses or set(statuses) != enrolled_student_ids:
-        raise ValueError("Attendance must include every currently enrolled student exactly once.")
+    if not statuses:
+        raise ValueError(
+            "Mark at least one student from the roster; every currently enrolled student can be saved over multiple submissions."
+        )
+    if not set(statuses).issubset(enrolled_student_ids):
+        raise ValueError("Attendance includes a student who is not currently enrolled.")
     if any(value not in {"present", "absent"} for value in statuses.values()):
         raise ValueError("Attendance status is invalid.")
     now = datetime.now(timezone.utc)
@@ -79,70 +74,93 @@ def finalize_attendance(
             database.attendance_records.delete_many({"session_id": old_id})
             database.audit_logs.delete_many({"target_id": old_id})
             database.attendance_sessions.delete_one({"_id": old_id, "status": "finalizing"})
+            existing = None
         else:
             raise RuntimeError("Attendance is currently being saved. Wait briefly, then try again.")
-    sid = ObjectId()
-    session_doc = {
-        "_id": sid,
-        "subject_id": subject_id,
-        "teacher_id": teacher_id,
-        "date": class_date.isoformat(),
-        "status": "finalized",
-        "student_count": len(statuses),
-        "created_at": now,
-    }
-    records = [
-        {
-            "session_id": sid,
-            "subject_id": subject_id,
-            "teacher_id": teacher_id,
-            "student_id": ObjectId(student_id),
-            "date": class_date.isoformat(),
-            "status": state,
-            "created_at": now,
-        }
-        for student_id, state in statuses.items()
-    ]
-    audit = {
-        "actor_id": teacher_id,
-        "action": "attendance.finalized",
-        "target_id": sid,
-        "subject_id": subject_id,
-        "date": class_date.isoformat(),
-        "created_at": now,
-    }
-
     try:
-        _insert_records_with_transaction(database, session_doc, records, audit)
-    except DuplicateKeyError as exc:
-        raise ValueError("Attendance has already been recorded for this subject and date.") from exc
-    except (OperationFailure, NotImplementedError) as exc:
-        # Standalone MongoDB does not support transactions. The fallback is recoverable,
-        # and reports failure unless both the session and all records are persisted.
-        if isinstance(exc, OperationFailure) and exc.code not in {20, 303, 251} and "transaction" not in str(exc).lower():
-            raise
-        logger.warning("MongoDB transactions are unavailable; using attendance compensation cleanup.")
-        try:
-            fallback = {**session_doc, "status": "finalizing"}
-            database.attendance_sessions.insert_one(fallback)
-            if records:
-                database.attendance_records.insert_many(records, ordered=True)
-            database.audit_logs.insert_one(audit)
-            updated = database.attendance_sessions.update_one(
-                {"_id": sid, "status": "finalizing"}, {"$set": {"status": "finalized"}}
+        sid = existing["_id"] if existing else ObjectId()
+        if not existing:
+            session_doc = {
+                "_id": sid,
+                "subject_id": subject_id,
+                "teacher_id": teacher_id,
+                "date": class_date.isoformat(),
+                "status": "in_progress",
+                "student_count": 0,
+                "expected_count": len(enrolled_student_ids),
+                "created_at": now,
+            }
+            try:
+                database.attendance_sessions.insert_one(session_doc)
+            except DuplicateKeyError:
+                # A concurrent save may have created the unique subject/date session.
+                existing = database.attendance_sessions.find_one(
+                    {"subject_id": subject_id, "date": class_date.isoformat()}
+                )
+                if not existing:
+                    raise
+                sid = existing["_id"]
+                if existing.get("status") == "finalized":
+                    raise ValueError("Attendance has already been recorded for this subject and date.")
+                if existing.get("status") == "finalizing":
+                    raise RuntimeError("Attendance is currently being saved. Wait briefly, then try again.")
+
+        for student_id, state in statuses.items():
+            record_filter = {"session_id": sid, "student_id": ObjectId(student_id)}
+            record_values = {
+                "subject_id": subject_id,
+                "teacher_id": teacher_id,
+                "date": class_date.isoformat(),
+                "status": state,
+                "updated_at": now,
+            }
+            try:
+                database.attendance_records.update_one(
+                    record_filter,
+                    {"$set": record_values, "$setOnInsert": {"created_at": now}},
+                    upsert=True,
+                )
+            except DuplicateKeyError:
+                # Another save inserted the same student's record between the upsert
+                # lookup and insert. Update that record and keep the save idempotent.
+                database.attendance_records.update_one(record_filter, {"$set": record_values})
+
+        marked_count = database.attendance_records.count_documents({"session_id": sid})
+        marked_ids = {
+            str(row["student_id"])
+            for row in database.attendance_records.find(
+                {"session_id": sid, "student_id": {"$in": [ObjectId(student_id) for student_id in enrolled_student_ids]}},
+                {"student_id": 1},
             )
-            if updated.modified_count != 1:
-                raise RuntimeError("Attendance session could not be finalized.")
-        except DuplicateKeyError as duplicate:
-            database.attendance_records.delete_many({"session_id": sid})
-            database.attendance_sessions.delete_one({"_id": sid})
-            database.audit_logs.delete_many({"target_id": sid})
-            raise ValueError("Attendance has already been recorded for this subject and date.") from duplicate
-        except Exception as fallback_error:
-            database.attendance_records.delete_many({"session_id": sid})
-            database.attendance_sessions.delete_one({"_id": sid})
-            database.audit_logs.delete_many({"target_id": sid})
-            raise RuntimeError("Attendance could not be saved. No partial session was retained.") from fallback_error
+        }
+        is_complete = enrolled_student_ids.issubset(marked_ids)
+        database.attendance_sessions.update_one(
+            {"_id": sid, "status": {"$ne": "finalized"}},
+            {
+                "$set": {
+                    "status": "finalized" if is_complete else "in_progress",
+                    "student_count": marked_count,
+                    "expected_count": len(enrolled_student_ids),
+                    "updated_at": now,
+                }
+            },
+        )
+        try:
+            database.audit_logs.insert_one(
+                {
+                    "actor_id": teacher_id,
+                    "action": "attendance.finalized" if is_complete else "attendance.saved",
+                    "target_id": sid,
+                    "subject_id": subject_id,
+                    "date": class_date.isoformat(),
+                    "student_ids": [ObjectId(student_id) for student_id in statuses],
+                    "created_at": now,
+                }
+            )
+        except PyMongoError as audit_error:
+            # Attendance records are already durable. A logging outage must not make
+            # the teacher repeat a save that has actually succeeded.
+            logger.warning("Attendance was saved but its audit event failed (%s).", type(audit_error).__name__)
     except PyMongoError as exc:
         raise RuntimeError("Attendance could not be saved. Please try again.") from exc
     return sid

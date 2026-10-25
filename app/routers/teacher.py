@@ -13,6 +13,7 @@ from app.utils.responses import render
 
 router = APIRouter(prefix="/teacher", tags=["teacher"])
 teacher_only = Depends(require_role("teacher"))
+VISIBLE_ATTENDANCE_STATUSES = {"$in": ["in_progress", "finalized"]}
 
 
 def assigned_subjects(database: Database, user: dict) -> list[dict]:
@@ -49,7 +50,7 @@ def _subject_stats(database: Database, subject: dict) -> dict:
     absent = sum(record.get("status") == "absent" for record in records)
     applicable = present + absent
     enrolled = database.enrollments.count_documents({"subject_id": subject_id, "active": {"$ne": False}})
-    sessions = database.attendance_sessions.count_documents({"subject_id": subject_id, "status": "finalized"})
+    sessions = database.attendance_sessions.count_documents({"subject_id": subject_id, "status": VISIBLE_ATTENDANCE_STATUSES})
     return {"present": present, "absent": absent, "sessions": sessions, "enrolled": enrolled, "percentage": attendance_percentage(present, applicable)}
 
 
@@ -102,14 +103,16 @@ def attendance_history(request: Request, subject_id: str = "", database: Databas
     if subject_id and subject_id not in allowed:
         raise HTTPException(status_code=404, detail="Subject not found.")
     query = {"subject_id": ObjectId(subject_id)} if subject_id else {"subject_id": {"$in": [ObjectId(item["id"]) for item in subjects]}}
-    sessions = list(database.attendance_sessions.find({**query, "status": "finalized"}).sort("date", DESCENDING).limit(200)) if subjects else []
+    sessions = list(database.attendance_sessions.find({**query, "status": VISIBLE_ATTENDANCE_STATUSES}).sort("date", DESCENDING).limit(200)) if subjects else []
     for session in sessions:
         subject = next((item for item in subjects if item["id"] == str(session["subject_id"])), None)
         rows = list(database.attendance_records.find({"session_id": session["_id"]}))
         session["id"] = str(session.pop("_id"))
+        session["subject_id"] = str(session["subject_id"])
         session["subject_name"] = subject["name"] if subject else "Subject"
         session["present_count"] = sum(row.get("status") == "present" for row in rows)
         session["absent_count"] = sum(row.get("status") == "absent" for row in rows)
+        session["expected_count"] = int(session.get("expected_count", session.get("student_count", len(rows))))
     return render(request, "teacher/attendance_history.html", title="Attendance history", subjects=subjects, sessions=sessions, selected_subject=subject_id)
 
 

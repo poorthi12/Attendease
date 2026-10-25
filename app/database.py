@@ -33,8 +33,9 @@ def get_client(settings: Settings | None = None) -> MongoClient:
     return _client
 
 
-def get_database(settings: Settings | None = None) -> Database:
-    settings = settings or get_settings()
+def get_database() -> Database:
+    """FastAPI dependency for the configured application database."""
+    settings = get_settings()
     return get_client(settings)[settings.mongodb_database]
 
 

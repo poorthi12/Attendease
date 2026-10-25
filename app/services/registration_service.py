@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -35,10 +36,28 @@ def subject_groups(database: Database) -> list[dict]:
         key = (subject.get("department", ""), subject.get("academic_year", ""), subject.get("semester", ""))
         grouped[key].append(subject)
 
+    def semester_sort_key(value: str) -> tuple[int, str]:
+        match = re.search(r"\d+", value)
+        return (int(match.group()) if match else 999, value.casefold())
+
     result = []
-    for (department, academic_year, semester), subjects in sorted(grouped.items()):
+    groups = sorted(
+        grouped.items(),
+        key=lambda item: (
+            item[0][0].casefold(),
+            item[0][1].casefold(),
+            semester_sort_key(item[0][2]),
+        ),
+    )
+    for (department, academic_year, semester), subjects in groups:
         if len(subjects) != 8:
             continue
+        subjects.sort(
+            key=lambda subject: (
+                subject.get("code", "").casefold(),
+                subject.get("name", "").casefold(),
+            )
+        )
         result.append(
             {
                 "key": str(subjects[0]["_id"]),
