@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block guest_content %}
+<header class="marketing-header">
+  <a href="/" class="brand"><img src="{{ url_for('static', path='images/logo.svg') }}" alt="" width="34" height="34"><span>Attend<span class="brand-light">Ease</span></span></a>
+  <div class="marketing-header-actions"><a href="#portals" class="text-link">Explore portals</a><a href="/login/student" class="button button-light button-small">Log in <span aria-hidden="true">↗</span></a><a href="/register" class="button button-light button-small">Register</a></div>
+</header>
+<main class="marketing">
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow"><span class="eyebrow-mark"></span> ATTENDANCE, IN FOCUS</div>
+      <h1>Every class.<br><span>Clearly accounted.</span></h1>
+      <p class="hero-description">A calmer way to manage attendance. Keep students, teachers, and administrators connected to the details that matter.</p>
+      <div class="hero-actions"><a href="/login/student" class="button button-light">Log in <span aria-hidden="true">↗</span></a><a href="/register" class="button button-outline">Register</a></div>
+      <div class="hero-footnote"><span class="status-dot"></span> Built for the rhythm of campus life</div>
+    </div>
+    <div class="hero-visual" aria-label="AttendEase dashboard preview">
+      <div class="visual-glow"></div>
+      <div class="preview-window">
+        <div class="preview-top"><div class="preview-brand"><img src="{{ url_for('static', path='images/logo.svg') }}" alt="" width="24"> AttendEase</div><div class="preview-dots"><i></i><i></i><i></i></div></div>
+        <div class="preview-body"><div class="preview-kicker">SAMPLE OVERVIEW</div><h3>Your attendance, at a glance</h3><p class="preview-muted">A preview of the student workspace.</p>
+          <div class="preview-metrics"><div><small>OVERALL ATTENDANCE</small><strong>92<span>%</span></strong><div class="mini-track"><i style="width:92%"></i></div></div><div><small>CLASSES ATTENDED</small><strong>46<span> / 50</span></strong><p>Across 5 subjects</p></div></div>
+          <div class="preview-chart-head"><strong>Weekly rhythm</strong><span>THIS MONTH</span></div><div class="preview-chart"><div style="height:40%"></div><div style="height:68%"></div><div style="height:52%"></div><div style="height:88%"></div><div style="height:64%"></div><div style="height:98%"></div><div style="height:74%"></div><div style="height:92%"></div><div style="height:57%"></div><div style="height:82%"></div><div style="height:69%"></div><div style="height:100%"></div></div><div class="preview-days"><span>01</span><span>05</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span></div>
+        </div>
+      </div>
+      <div class="float-card"><span class="float-icon">✓</span><span><strong>Up to date</strong><small>Your records are current</small></span></div>
+    </div>
+  </section>
+  <section class="trust-strip"><span>ONE CLEAR VIEW</span><div><b>Students</b><i></i><b>Teachers</b><i></i><b>Administrators</b></div><span>MADE FOR CAMPUS</span></section>
+  <section class="portal-section" id="portals">
+    <div class="section-heading"><div><div class="eyebrow">THE RIGHT VIEW, EVERY TIME</div><h2>One system. Three perspectives.</h2></div><p>Purposeful tools give each person a clear path through the school day.</p></div>
+    <div class="portal-grid">
+      <a href="/login/student" class="portal-card"><span class="portal-number">01</span><span class="portal-icon">◉</span><h3>Student</h3><p>See your attendance, subject progress, and absent dates in one simple view.</p><span class="card-arrow">Explore portal <b>↗</b></span></a>
+      <a href="/login/teacher" class="portal-card"><span class="portal-number">02</span><span class="portal-icon">▤</span><h3>Teacher</h3><p>Manage assigned classes, record attendance, and understand class trends.</p><span class="card-arrow">Explore portal <b>↗</b></span></a>
+      <a href="/login/admin" class="portal-card"><span class="portal-number">03</span><span class="portal-icon">⌘</span><h3>Administrator</h3><p>Keep accounts, subjects, teacher assignments, and enrollments organized.</p><span class="card-arrow">Explore portal <b>↗</b></span></a>
+    </div>
+  </section>
+  <footer class="marketing-footer"><a href="/" class="brand"><img src="{{ url_for('static', path='images/logo.svg') }}" alt="" width="28"><span>Attend<span class="brand-light">Ease</span></span></a><span>Thoughtful attendance management.</span><span>© AttendEase</span></footer>
+</main>
+{% endblock %}

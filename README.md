@@ -32,7 +32,7 @@ Most routes are synchronous `def` endpoints, so FastAPI runs blocking PyMongo ca
 
 ### Collections and indexes
 
-The application uses `users`, `students`, `teachers`, `subjects`, `subject_assignments`, `enrollments`, `attendance_sessions`, `attendance_records`, `audit_logs`, `auth_attempts`, and `departments`.
+The application uses `users`, `students`, `teachers`, `subjects`, `subject_assignments`, `enrollments`, `attendance_sessions`, `attendance_records`, `audit_logs`, `auth_attempts`, `departments`, and `admin_bootstrap`.
 
 Startup initializes indexes once per application process. `scripts/create_indexes.py` can also initialize them explicitly. Indexes include unique normalized user email, student USN, subject code, profile-to-user references, teacher/subject assignment, student/subject enrollment, subject/date session, and session/student attendance record keys. Supporting indexes cover teacher, student, subject, and date queries. Sign-in throttle records use a TTL index.
 
@@ -87,7 +87,7 @@ uv run python scripts/create_indexes.py
 
 ## Bootstrap the first administrator
 
-There is no public admin registration route. Create the first administrator from a trusted terminal. The script prompts for a password without echoing it; `ADMIN_EMAIL`, `ADMIN_NAME`, and `ADMIN_PASSWORD` may be supplied through the process environment instead.
+Choose **Register** on the landing page to create the first administrator account, or use the trusted-terminal command below. After setup, students and teachers can register themselves and choose subjects. The administrator must add exactly eight active subjects for each department, academic year, and semester before that semester appears in registration. The page and command share a one-time database marker so only one first administrator can be created. The script prompts for a password without echoing it; `ADMIN_EMAIL`, `ADMIN_NAME`, and `ADMIN_PASSWORD` may be supplied through the process environment instead.
 
 ```powershell
 uv run python -m scripts.bootstrap_admin
@@ -101,7 +101,7 @@ The script refuses to create a second administrator while an active admin exists
 uv run uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000`. Sign-in pages are `/login/student`, `/login/teacher`, and `/login/admin`. The health endpoint at `/health` checks whether the web process is responsive; it does not ping MongoDB.
+Open `http://127.0.0.1:8000`. The landing page offers **Log in** and **Register**. Sign-in pages are `/login/student`, `/login/teacher`, and `/login/admin`; `/register` creates the first administrator, then offers student or teacher registration. A teacher's selected subjects become teaching assignments. A student's semester and subject choices create enrollments that populate the selected teachers' class rosters and attendance sheets. The health endpoint at `/health` checks whether the web process is responsive; it does not ping MongoDB.
 
 ## Tests and checks
 

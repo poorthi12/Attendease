@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block guest_content %}
+<main class="login-page">
+  <a href="/" class="brand login-brand"><img src="{{ url_for('static', path='images/logo.svg') }}" alt="" width="34" height="34"><span>Attend<span class="brand-light">Ease</span></span></a>
+  <div class="login-layout register-layout">
+    <section class="login-aside"><div class="eyebrow"><span class="eyebrow-mark"></span> GET STARTED</div><h1>A clear start<br>for your campus.</h1><p>{% if registration_open %}Create the first administrator account to set up AttendEase.{% else %}Choose your role to register for AttendEase.{% endif %}</p><div class="login-aside-rule"></div><span>ATTENDANCE, IN GOOD ORDER.</span></section>
+    <section class="login-card">
+      <a href="/" class="back-link"><span aria-hidden="true">&#8592;</span> <span>Back to home</span></a>
+      {% if registration_open is sameas true %}
+        <div class="login-card-head"><span class="login-symbol" aria-hidden="true">+</span><div class="eyebrow">FIRST-TIME SETUP</div><h2>Register</h2><p>Create the first administrator account for this AttendEase workspace.</p></div>
+        {% if errors %}<div class="form-errors" role="alert"><strong>Check these details:</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+        <form method="post" action="/register" class="form-stack">
+          <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+          <label class="field-label" for="name">Full name</label><input class="input" id="name" name="name" type="text" autocomplete="name" placeholder="Your name" required minlength="1" maxlength="100" value="{{ form.name or '' }}">
+          <label class="field-label" for="email">Email address</label><input class="input" id="email" name="email" type="email" autocomplete="email" placeholder="name@school.edu" required maxlength="254" value="{{ form.email or '' }}">
+          <label class="field-label" for="password">Password</label><input class="input" id="password" name="password" type="password" autocomplete="new-password" placeholder="At least 10 characters" required minlength="10" maxlength="128">
+          <label class="field-label" for="confirm-password">Confirm password</label><input class="input" id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Enter your password again" required minlength="10" maxlength="128">
+          <button class="button button-light button-wide" type="submit">Create account <span aria-hidden="true">&#8594;</span></button>
+        </form>
+        <p class="login-footnote">Already registered? <a href="/login/admin">Log in</a></p>
+      {% elif registration_open is sameas false %}
+        <div class="login-card-head"><span class="login-symbol" aria-hidden="true">&#10003;</span><div class="eyebrow">WELCOME TO ATTENDEASE</div><h2>Register your account</h2><p>Choose your role. Your subject choices will connect your account to classes automatically.</p></div>
+        <div class="role-register-options"><a class="button button-light button-wide" href="/register/student">Register as a student <span aria-hidden="true">&#8594;</span></a><a class="button button-quiet button-wide" href="/register/teacher">Register as a teacher <span aria-hidden="true">&#8594;</span></a></div>
+        <p class="login-footnote">Already registered? <a href="/login/student">Log in</a></p>
+      {% else %}
+        <div class="login-card-head"><span class="login-symbol" aria-hidden="true">!</span><div class="eyebrow">TEMPORARILY UNAVAILABLE</div><h2>Try again shortly</h2><p>We couldn't check whether this workspace is ready for registration.</p></div>
+        <a class="button button-quiet button-wide" href="/">Back to home</a>
+      {% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}

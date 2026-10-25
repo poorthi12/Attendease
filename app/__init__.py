@@ -1,0 +1,1 @@
+"""AttendEase FastAPI application package."""

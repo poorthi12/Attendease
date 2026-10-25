@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101010">
+  <title>{% if title %}{{ title }} · {% endif %}AttendEase</title>
+  <link rel="icon" href="{{ url_for('static', path='images/logo.svg') }}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% if current_user %}app-body{% else %}guest-body{% endif %}">
+{% if current_user %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="brand" href="/{{ current_user.role if current_user.role != 'admin' else 'admin' }}" aria-label="AttendEase home">
+      <img src="{{ url_for('static', path='images/logo.svg') }}" alt="" width="34" height="34">
+      <span>Attend<span class="brand-light">Ease</span></span>
+    </a>
+    <div class="side-label">WORKSPACE</div>
+    <nav class="side-nav">
+      {% if current_user.role == 'student' %}
+        <a href="/student" class="nav-link"><span class="nav-icon">⌂</span>Overview</a>
+        <a href="/student/subjects" class="nav-link"><span class="nav-icon">▤</span>My subjects</a>
+        <a href="/student/attendance" class="nav-link"><span class="nav-icon">◷</span>Attendance</a>
+        <a href="/student/absent-dates" class="nav-link"><span class="nav-icon">▦</span>Absent dates</a>
+        <a href="/student/profile" class="nav-link"><span class="nav-icon">◉</span>My profile</a>
+      {% elif current_user.role == 'teacher' %}
+        <a href="/teacher" class="nav-link"><span class="nav-icon">⌂</span>Overview</a>
+        <a href="/teacher/subjects" class="nav-link"><span class="nav-icon">▤</span>My subjects</a>
+        <a href="/teacher/attendance-history" class="nav-link"><span class="nav-icon">◷</span>Attendance history</a>
+        <a href="/teacher/analytics" class="nav-link"><span class="nav-icon">⌁</span>Analytics</a>
+      {% else %}
+        <a href="/admin" class="nav-link"><span class="nav-icon">⌂</span>Overview</a>
+        <a href="/admin/students" class="nav-link"><span class="nav-icon">♙</span>Students</a>
+        <a href="/admin/teachers" class="nav-link"><span class="nav-icon">♧</span>Teachers</a>
+        <a href="/admin/subjects" class="nav-link"><span class="nav-icon">▤</span>Subjects</a>
+        <a href="/admin/assignments" class="nav-link"><span class="nav-icon">⇄</span>Assignments</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-note"><span class="status-dot"></span><span>All caught up<br><small>Your workspace is ready</small></span></div>
+      <div class="side-user"><div class="avatar">{{ (current_user.name or 'A')[:1]|upper }}</div><div class="side-user-meta"><strong>{{ current_user.name or 'Account' }}</strong><small>{{ current_user.role|title }}</small></div></div>
+    </div>
+  </aside>
+  <div class="shell-main">
+    <header class="topbar">
+      <button type="button" class="icon-button mobile-menu" data-sidebar-toggle aria-label="Open navigation"><span></span><span></span></button>
+      <div class="breadcrumb">AttendEase <span>/</span> <strong>{{ title or 'Workspace' }}</strong></div>
+      <div class="topbar-actions">
+        <span class="topbar-date">{{ now().strftime('%A, %b %d') if now is defined else '' }}</span>
+        <div class="top-avatar">{{ (current_user.name or 'A')[:1]|upper }}</div>
+        <form method="post" action="/logout" class="logout-form"><input type="hidden" name="csrf" value="{{ csrf_token(request) }}"><button type="submit" class="button button-quiet button-small">Sign out</button></form>
+      </div>
+    </header>
+    <main class="page-content" id="main-content">
+      {% if flash %}<div class="toast toast-{{ flash.kind }}" role="status" data-toast>{{ flash.message }}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="app-footer"><span>AttendEase</span><span>Clear records. Better outcomes.</span></footer>
+  </div>
+</div>
+{% else %}
+  {% if flash %}<div class="toast toast-{{ flash.kind }} guest-toast" role="status" data-toast>{{ flash.message }}</div>{% endif %}
+  {% block guest_content %}{% endblock %}
+{% endif %}
+<dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
+  <div class="confirm-dialog-mark">?</div>
+  <h2 id="confirm-title">Confirm action</h2>
+  <p id="confirm-description">Continue with this action?</p>
+  <div class="confirm-dialog-actions"><button type="button" class="button button-quiet button-small" data-dialog-cancel>Cancel</button><button type="button" class="button button-light button-small" data-dialog-confirm>Continue</button></div>
+</dialog>
+<script src="{{ url_for('static', path='js/main.js') }}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

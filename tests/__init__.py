@@ -1,0 +1,1 @@
+"""Isolated AttendEase test suite."""
